@@ -281,9 +281,8 @@ impl DecisionEngine {
             if *decision == Decision::Trash {
                 let staged_path = self.get_staged_path(*index);
                 if staged_path.exists() {
-                    trash::delete(&staged_path).map_err(|e| {
-                        io::Error::new(io::ErrorKind::Other, format!("Trash error: {}", e))
-                    })?;
+                    trash::delete(&staged_path)
+                        .map_err(|e| io::Error::other(format!("Trash error: {}", e)))?;
                 }
             }
         }
