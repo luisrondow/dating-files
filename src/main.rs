@@ -1,25 +1,20 @@
-mod async_preview;
-mod cli;
-mod domain;
-mod preview;
-mod tui;
+use file_tinder::async_preview::SyncPreviewManager;
+use file_tinder::cli::{AppConfig, Args, SortOrder};
+use file_tinder::domain::{
+    discover_files_with_options, AppState, Decision, DecisionEngine, DiscoveryOptions, SortBy,
+};
+use file_tinder::tui::{
+    handle_key_event, render_help_overlay, render_summary, render_with_preview, KeyAction,
+    ViewState,
+};
 
-use async_preview::SyncPreviewManager;
-use cli::{AppConfig, Args, SortOrder};
 use crossterm::{
     event::{self, Event},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use domain::{
-    discover_files_with_options, AppState, Decision, DecisionEngine, DiscoveryOptions, SortBy,
-};
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{io, time::Duration};
-use tui::{
-    handle_key_event, render_help_overlay, render_summary, render_with_preview, KeyAction,
-    ViewState,
-};
 
 fn main() -> io::Result<()> {
     // Parse command line arguments

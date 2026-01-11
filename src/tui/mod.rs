@@ -1,47 +1,23 @@
 // TUI module for rendering the terminal interface
-#![allow(dead_code)]
+pub mod colors;
+pub mod helpers;
+pub mod input;
+
+// Re-exports
+pub use colors::*;
+pub use helpers::{calculate_progress, format_file_size};
+pub use input::{handle_key_event, KeyAction};
 
 use crate::async_preview::{PreviewState, SyncPreviewManager};
 use crate::domain::{AppState, DecisionStatistics};
 use crate::preview;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Clear, Gauge, Paragraph, Wrap},
     Frame,
 };
-
-// Color scheme - Modern dark theme with vibrant accents
-const ACCENT_PRIMARY: Color = Color::Rgb(255, 107, 107); // Coral red for trash
-const ACCENT_SECONDARY: Color = Color::Rgb(107, 255, 158); // Mint green for keep
-const ACCENT_HIGHLIGHT: Color = Color::Rgb(255, 217, 102); // Golden yellow for highlights
-const TEXT_PRIMARY: Color = Color::Rgb(240, 240, 240); // Off-white
-const TEXT_SECONDARY: Color = Color::Rgb(160, 160, 170); // Muted gray
-const BG_DARK: Color = Color::Rgb(30, 30, 40); // Deep purple-black
-const BORDER_COLOR: Color = Color::Rgb(80, 80, 100); // Subtle purple-gray
-
-/// Represents the result of handling a key event
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KeyAction {
-    /// Quit the application
-    Quit,
-    /// Mark current file to keep
-    Keep,
-    /// Mark current file to trash
-    Trash,
-    /// Move to next file
-    Next,
-    /// Move to previous file
-    Previous,
-    /// Undo last decision
-    Undo,
-    /// Toggle help overlay
-    Help,
-    /// No action
-    None,
-}
 
 /// UI view state
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,65 +28,6 @@ pub enum ViewState {
     Help,
     /// Summary screen at end
     Summary,
-}
-
-/// Maps keyboard events to actions
-pub fn handle_key_event(key: KeyEvent) -> KeyAction {
-    match (key.code, key.modifiers) {
-        // Quit: q or Ctrl+C
-        (KeyCode::Char('q'), KeyModifiers::NONE) => KeyAction::Quit,
-        (KeyCode::Char('c'), KeyModifiers::CONTROL) => KeyAction::Quit,
-        (KeyCode::Esc, KeyModifiers::NONE) => KeyAction::Quit,
-
-        // Keep: Right arrow or k
-        (KeyCode::Right, KeyModifiers::NONE) => KeyAction::Keep,
-        (KeyCode::Char('k'), KeyModifiers::NONE) => KeyAction::Keep,
-
-        // Trash: Left arrow or t
-        (KeyCode::Left, KeyModifiers::NONE) => KeyAction::Trash,
-        (KeyCode::Char('t'), KeyModifiers::NONE) => KeyAction::Trash,
-
-        // Navigation
-        (KeyCode::Down, KeyModifiers::NONE) => KeyAction::Next,
-        (KeyCode::Up, KeyModifiers::NONE) => KeyAction::Previous,
-        (KeyCode::Char('j'), KeyModifiers::NONE) => KeyAction::Next,
-        (KeyCode::Char('i'), KeyModifiers::NONE) => KeyAction::Previous,
-
-        // Undo: u or Ctrl+Z
-        (KeyCode::Char('u'), KeyModifiers::NONE) => KeyAction::Undo,
-        (KeyCode::Char('z'), KeyModifiers::CONTROL) => KeyAction::Undo,
-
-        // Help: ?
-        (KeyCode::Char('?'), KeyModifiers::NONE) => KeyAction::Help,
-
-        _ => KeyAction::None,
-    }
-}
-
-/// Calculates progress percentage
-pub fn calculate_progress(current: usize, total: usize) -> f64 {
-    if total == 0 {
-        0.0
-    } else {
-        (current as f64 / total as f64) * 100.0
-    }
-}
-
-/// Formats file size in human-readable format
-pub fn format_file_size(size: u64) -> String {
-    const KB: u64 = 1024;
-    const MB: u64 = KB * 1024;
-    const GB: u64 = MB * 1024;
-
-    if size >= GB {
-        format!("{:.1} GB", size as f64 / GB as f64)
-    } else if size >= MB {
-        format!("{:.1} MB", size as f64 / MB as f64)
-    } else if size >= KB {
-        format!("{:.1} KB", size as f64 / KB as f64)
-    } else {
-        format!("{} B", size)
-    }
 }
 
 /// Renders the TUI (legacy, without async preview)
@@ -337,11 +254,6 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1]
-}
-
-/// Renders the header with file info (legacy)
-fn render_header(frame: &mut Frame, area: Rect, state: &AppState) {
-    render_header_polished(frame, area, state);
 }
 
 /// Renders the polished header with progress bar
@@ -571,11 +483,6 @@ fn generate_loading_indicator(file: &crate::domain::FileEntry) -> Vec<String> {
     ]
 }
 
-/// Renders the footer with controls (legacy)
-fn render_footer(frame: &mut Frame, area: Rect) {
-    render_footer_polished(frame, area);
-}
-
 /// Renders the polished footer with styled controls
 fn render_footer_polished(frame: &mut Frame, area: Rect) {
     let controls = Line::from(vec![
@@ -625,7 +532,6 @@ mod tests {
     use super::*;
     use crate::domain::{FileEntry, FileType};
     use chrono::Utc;
-    use crossterm::event::KeyModifiers;
     use ratatui::{backend::TestBackend, Terminal};
     use std::path::PathBuf;
 
@@ -636,79 +542,6 @@ mod tests {
             size: 1024,
             modified_date: Utc::now(),
             file_type: FileType::Text,
-        }
-    }
-
-    mod key_handling_tests {
-        use super::*;
-
-        #[test]
-        fn test_key_quit() {
-            let key = KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Quit);
-
-            let key = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
-            assert_eq!(handle_key_event(key), KeyAction::Quit);
-
-            let key = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Quit);
-        }
-
-        #[test]
-        fn test_key_keep() {
-            let key = KeyEvent::new(KeyCode::Right, KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Keep);
-
-            let key = KeyEvent::new(KeyCode::Char('k'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Keep);
-        }
-
-        #[test]
-        fn test_key_trash() {
-            let key = KeyEvent::new(KeyCode::Left, KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Trash);
-
-            let key = KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Trash);
-        }
-
-        #[test]
-        fn test_key_navigation() {
-            let key = KeyEvent::new(KeyCode::Down, KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Next);
-
-            let key = KeyEvent::new(KeyCode::Up, KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Previous);
-
-            let key = KeyEvent::new(KeyCode::Char('j'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Next);
-
-            let key = KeyEvent::new(KeyCode::Char('i'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Previous);
-        }
-
-        #[test]
-        fn test_key_undo() {
-            let key = KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Undo);
-
-            let key = KeyEvent::new(KeyCode::Char('z'), KeyModifiers::CONTROL);
-            assert_eq!(handle_key_event(key), KeyAction::Undo);
-        }
-
-        #[test]
-        fn test_key_none() {
-            let key = KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::None);
-
-            let key = KeyEvent::new(KeyCode::Char('a'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::None);
-        }
-
-        #[test]
-        fn test_key_help() {
-            let key = KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE);
-            assert_eq!(handle_key_event(key), KeyAction::Help);
         }
     }
 
@@ -860,35 +693,6 @@ mod tests {
 
             // Check for summary content
             assert!(buffer_str.contains("Summary") || buffer_str.contains("Complete"));
-        }
-    }
-
-    mod utility_tests {
-        use super::*;
-
-        #[test]
-        fn test_calculate_progress() {
-            assert_eq!(calculate_progress(0, 10), 0.0);
-            assert_eq!(calculate_progress(5, 10), 50.0);
-            assert_eq!(calculate_progress(10, 10), 100.0);
-            assert_eq!(calculate_progress(0, 0), 0.0);
-        }
-
-        #[test]
-        fn test_format_file_size() {
-            assert_eq!(format_file_size(0), "0 B");
-            assert_eq!(format_file_size(512), "512 B");
-            assert_eq!(format_file_size(1024), "1.0 KB");
-            assert_eq!(format_file_size(1536), "1.5 KB");
-            assert_eq!(format_file_size(1048576), "1.0 MB");
-            assert_eq!(format_file_size(1073741824), "1.0 GB");
-        }
-
-        #[test]
-        fn test_view_state_enum() {
-            assert_eq!(ViewState::Browsing, ViewState::Browsing);
-            assert_ne!(ViewState::Browsing, ViewState::Help);
-            assert_ne!(ViewState::Help, ViewState::Summary);
         }
     }
 }

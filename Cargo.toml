@@ -3,6 +3,14 @@ name = "file-tinder"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "file_tinder"
+path = "src/lib.rs"
+
+[[bin]]
+name = "file-tinder"
+path = "src/main.rs"
+
 [dependencies]
 chrono = "0.4"
 trash = "4.0"
@@ -14,6 +22,7 @@ image = "0.25"
 pdfium-render = "0.8"
 tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "time", "macros"] }
 clap = { version = "4", features = ["derive"] }
+thiserror = "1"
 
 [dev-dependencies]
 tempfile = "3"
